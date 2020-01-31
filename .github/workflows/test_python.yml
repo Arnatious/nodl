@@ -16,6 +16,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
     steps:
     - uses: ros-tooling/setup-ros2@0.0.11
     - uses: ros-tooling/action-ros2-ci@0.0.11
@@ -25,3 +26,4 @@ jobs:
       with:
         name: colcon-logs
         path: ros2_ws/log
+      if: always()
