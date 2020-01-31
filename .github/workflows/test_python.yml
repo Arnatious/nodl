@@ -18,8 +18,8 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
       fail-fast: false
     steps:
-    - uses: ros-tooling/setup-ros2@0.0.11
-    - uses: ros-tooling/action-ros2-ci@0.0.11
+    - uses: ros-tooling/setup-ros2@0.0.12
+    - uses: ros-tooling/action-ros-ci@0.0.13
       with: 
         package-name: nodl_python
     - uses: actions/upload-artifact@master
