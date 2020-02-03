@@ -28,7 +28,7 @@ def str_to_bool(boolean_string: str) -> bool:
 
 
 class InvalidNoDLException(Exception):
-    def __init__(self, message: str, element: Optional[etree._Element] = None):
+    def __init__(self, message: str, element: Optional[etree._Element] = None) -> None:
         if element:
             super().__init__(f"{element.base}:{element.sourceline}: " + message)
         else:
@@ -36,10 +36,10 @@ class InvalidNoDLException(Exception):
 
 
 class UnsupportedInterfaceException(InvalidNoDLException):
-    def __init__(self, element: etree._Element):
+    def __init__(self, element: etree._Element) -> None:
         super().__init__(
-            f"{element.sourceline}: Unsupported interface version: {element.attrib['version']}"
-            f"> {NODL_MAX_SUPPORTED_VERSION}"
+            f"{element.base}:{element.sourceline}: Unsupported interface version: "
+            f"{element.attrib['version']} > {NODL_MAX_SUPPORTED_VERSION}"
         )
 
 
@@ -47,35 +47,36 @@ class NoNodeInterfaceWarning(UserWarning):
     pass
 
 
+def parse_element_tree(element_tree: etree._ElementTree) -> etree._Element:
+    interface = element_tree.getroot()
+    if interface.tag != "interface":
+        interface = interface.find("interface")
+        if not interface:
+            raise InvalidNoDLException(f"No interface tag in {element_tree.docinfo.URL}")
+    return interface
+
+
 def parse_nodl_file(path: Path):
     """"""
     full_path = path.resolve()
-
-    nodl_tree: etree._ElementTree = etree.parse(str(path))
-
-    interface = nodl_tree.getroot()
-    if nodl_tree.getroot().tag != "interface":
-        interface = nodl_tree.find("interface")
-        if not interface:
-            raise InvalidNoDLException(f"No interface tag in {nodl_tree.docinfo.URL}")
+    element_tree = etree.parse(str(full_path))
+    interface = parse_element_tree(element_tree)
 
     try:
-        version = nodl_tree.attrib["version"]
+        version = interface.attrib["version"]
     except KeyError:
-        raise InvalidNoDLException(
-            f"Missing version attribute in 'interface'.", interface
-        )
+        raise InvalidNoDLException(f"Missing version attribute in 'interface'.", interface)
 
     if version == "1":
-        return InterfaceParser_v1(nodl_tree)
+        return InterfaceParser_v1(interface)
     else:
-        raise UnsupportedInterfaceException(version)
+        raise UnsupportedInterfaceException(interface)
 
 
 class InterfaceParser_v1:
     """"""
 
-    def __init__(self, interface: etree._Element):
+    def __init__(self, interface: etree._Element) -> None:
 
         if type(interface) is not etree._Element:
             raise TypeError(f"Invalid type passed to interface constructor: {type(interface)}")
@@ -95,7 +96,7 @@ class InterfaceParser_v1:
         if not (server or client):
             warnings.warn(
                 f"{element.base}:{element.sourceline}: {name} is neither server or client",
-                NoNodeInterfaceWarning
+                NoNodeInterfaceWarning,
             )
 
         return Action(name=name, action_type=action_type, server=server, client=client)
@@ -116,7 +117,7 @@ class InterfaceParser_v1:
         if not (server or client):
             warnings.warn(
                 f"{element.base}:{element.sourceline}: {name} is neither server or client",
-                NoNodeInterfaceWarning
+                NoNodeInterfaceWarning,
             )
 
         return Service(name=name, service_type=service_type, server=server, client=client)
@@ -134,6 +135,13 @@ class InterfaceParser_v1:
 
         publisher = str_to_bool(attribs.get("publisher", False))
         subscriber = str_to_bool(attribs.get("subscriber", False))
+
+        if not (publisher or subscriber):
+            warnings.warn(
+                f"{element.base}:{element.sourceline}: {name} is neither publisher or subscriber",
+                NoNodeInterfaceWarning,
+            )
+
         return Topic(
             name=name, message_type=message_type, publisher=publisher, subscriber=subscriber
         )

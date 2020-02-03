@@ -1,41 +1,46 @@
 from pathlib import Path
-import xml.etree.ElementTree as ETree
+import lxml.etree as etree
 
 import pytest
 
-import nodl
+import nodl.nodl_parse as nodl_parse
 
 
 @pytest.fixture()
-def valid_nodl() -> ETree.ElementTree:
-    return ETree.parse(str(Path('test') / 'nodl.xml'))
+def valid_nodl() -> etree._ElementTree:
+    return etree.parse(str(Path("test") / "nodl.xml"))
+
+
+def test_parse_element_tree(mocker):
+    not_interface = etree.Element("notinterface")
+    mock_et = mocker.patch(
+        "nodl.nodl_parse.etree._ElementTree", **{"getroot.return_value": not_interface}
+    )
+    with pytest.raises(nodl_parse.InvalidNoDLException) as excinfo:
+        nodl_parse.parse_element_tree(mock_et)
+    assert "No interface tag in" in str(excinfo.value)
 
 
 def test_parse_nodl_file_valid(mocker):
-    mocker.patch('nodl.nodl_parse.parse_nodl')
+    mocker.patch("nodl.nodl_parse.InterfaceParser_v1")
 
     # Test if accepts a valid xml file
-    nodl.nodl_parse.parse_nodl_file('test/nodl.xml')
+    nodl_parse.parse_nodl_file(Path("test/nodl.xml"))
 
 
-def test_parse_nodl_valid(mocker, valid_nodl):
-    nodl.nodl_parse.parse_nodl(valid_nodl.getroot())
+def test_parse_nodl_file_invalid(mocker):
+    mocker.patch("nodl.nodl_parse.etree.parse")
 
-
-def test_parse_nodl_invalid(mocker):
-    mocker.patch('nodl.nodl_parse.InterfaceParser_v1')
-    not_interface = ETree.Element("notinterface")
-    interface_no_version = ETree.Element("interface")
-    interface_future_version = ETree.Element("interface",
-                                             {'version': str(nodl.nodl_parse.NODL_MAX_SUPPORTED_VERSION + 1)})  # noqa: E501
-
-    with pytest.raises(nodl.nodl_parse.InvalidNoDLException) as excinfo:
-        nodl.nodl_parse.parse_nodl(not_interface)
-    assert "Invalid root element" in str(excinfo.value)
-
-    with pytest.raises(nodl.nodl_parse.InvalidNoDLException) as excinfo:
-        nodl.nodl_parse.parse_nodl(interface_no_version)
+    interface_no_version = etree.Element("interface")
+    mocker.patch("nodl.nodl_parse.parse_element_tree", return_value=interface_no_version)
+    with pytest.raises(nodl_parse.InvalidNoDLException) as excinfo:
+        nodl_parse.parse_nodl_file(Path())
     assert "Missing version attribute in 'interface'" in str(excinfo.value)
 
-    with pytest.raises(nodl.nodl_parse.UnsupportedInterfaceException) as excinfo:
-        nodl.nodl_parse.parse_nodl(interface_future_version)
+    interface_future_version = etree.Element(
+        "interface", {"version": str(nodl_parse.NODL_MAX_SUPPORTED_VERSION + 1)}
+    )
+    mocker.patch("nodl.nodl_parse.parse_element_tree", return_value=interface_future_version)
+    with pytest.raises(nodl_parse.UnsupportedInterfaceException) as excinfo:
+        nodl_parse.parse_nodl_file(Path())
+    assert "Unsupported interface version" in str(excinfo)
