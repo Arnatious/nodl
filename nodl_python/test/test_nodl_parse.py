@@ -4,6 +4,7 @@ import lxml.etree as etree
 import pytest
 
 import nodl.nodl_parse as nodl_parse
+import nodl.nodl_types as nodl_types
 
 
 @pytest.fixture()
@@ -12,7 +13,8 @@ def valid_nodl() -> etree._ElementTree:
 
 
 def test_parse_element_tree(mocker):
-    not_interface = etree.Element("notinterface")
+    not_interface: etree._Element = etree.Element("notinterface")
+    not_interface.append(etree.Element('stillnotelement'))
     mock_et = mocker.patch(
         "nodl.nodl_parse.etree._ElementTree", **{"getroot.return_value": not_interface}
     )
@@ -22,7 +24,7 @@ def test_parse_element_tree(mocker):
 
 
 def test_parse_nodl_file_valid(mocker):
-    mocker.patch("nodl.nodl_parse.InterfaceParser_v1")
+    mocker.patch("nodl.nodl_parse.Interface_v1")
 
     # Test if accepts a valid xml file
     nodl_parse.parse_nodl_file(Path("test/nodl.xml"))
@@ -44,3 +46,23 @@ def test_parse_nodl_file_invalid(mocker):
     with pytest.raises(nodl_parse.UnsupportedInterfaceException) as excinfo:
         nodl_parse.parse_nodl_file(Path())
     assert "Unsupported interface version" in str(excinfo)
+
+
+class TestInterface_v1:
+
+    def test___init___(self, valid_nodl):
+        assert nodl_parse.Interface_v1(valid_nodl)
+
+    def test_parse_action(self):
+        element: etree._Element = etree.Element("action", {
+            "name": "foo",
+            "type": "bar",
+            "server": "True",
+            "client": "False"
+        })
+
+        assert type(nodl_parse.Interface_v1.parse_action(element)) is nodl_types.Action
+
+        element.attrib['server'] = "False"
+        with pytest.warns(nodl_parse.NoNodeInterfaceWarning):
+            assert type(nodl_parse.Interface_v1.parse_action(element)) is nodl_types.Action

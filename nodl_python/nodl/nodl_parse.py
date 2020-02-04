@@ -24,12 +24,12 @@ NODL_MAX_SUPPORTED_VERSION: int = 1
 
 def str_to_bool(boolean_string: str) -> bool:
     """Simple helper function for converting xml bool entries to bools."""
-    return boolean_string.lower in ["true", "1"]
+    return boolean_string.lower() in ["true", "1"]
 
 
 class InvalidNoDLException(Exception):
     def __init__(self, message: str, element: Optional[etree._Element] = None) -> None:
-        if element:
+        if element is not None:
             super().__init__(f"{element.base}:{element.sourceline}: " + message)
         else:
             super().__init__(message)
@@ -51,7 +51,7 @@ def parse_element_tree(element_tree: etree._ElementTree) -> etree._Element:
     interface = element_tree.getroot()
     if interface.tag != "interface":
         interface = interface.find("interface")
-        if not interface:
+        if interface is None:
             raise InvalidNoDLException(f"No interface tag in {element_tree.docinfo.URL}")
     return interface
 
@@ -68,21 +68,19 @@ def parse_nodl_file(path: Path):
         raise InvalidNoDLException(f"Missing version attribute in 'interface'.", interface)
 
     if version == "1":
-        return InterfaceParser_v1(interface)
+        return Interface_v1(interface)
     else:
         raise UnsupportedInterfaceException(interface)
 
 
-class InterfaceParser_v1:
+class Interface_v1:
     """"""
 
     def __init__(self, interface: etree._Element) -> None:
-
-        if type(interface) is not etree._Element:
-            raise TypeError(f"Invalid type passed to interface constructor: {type(interface)}")
         self._interface = interface
 
-    def parse_action(self, element: etree._Element) -> Action:
+    @classmethod
+    def parse_action(cls, element: etree._Element) -> Action:
         """"""
         # ETree.Element contains a `get()` feature that can be used to avoid
         # a potential dict creation from accessing `element.attrib`. We don't use
@@ -101,11 +99,13 @@ class InterfaceParser_v1:
 
         return Action(name=name, action_type=action_type, server=server, client=client)
 
-    def parse_parameter(self, element: etree._Element) -> Parameter:
+    @classmethod
+    def parse_parameter(cls, element: etree._Element) -> Parameter:
         """"""
         return Parameter(name=element.attrib["name"], parameter_type=element.attrib["type"])
 
-    def parse_service(self, element: etree._Element) -> Service:
+    @classmethod
+    def parse_service(cls, element: etree._Element) -> Service:
         """"""
         attribs = element.attrib
         name = attribs["name"]
@@ -122,7 +122,8 @@ class InterfaceParser_v1:
 
         return Service(name=name, service_type=service_type, server=server, client=client)
 
-    def parse_topic(self, element: etree._Element) -> Topic:
+    @classmethod
+    def parse_topic(cls, element: etree._Element) -> Topic:
         """"""
         attribs = element.attrib
         try:
@@ -146,13 +147,15 @@ class InterfaceParser_v1:
             name=name, message_type=message_type, publisher=publisher, subscriber=subscriber
         )
 
-    def parse_nodes(self) -> List[Node]:
+    @classmethod
+    def parse_nodes(cls) -> List[Node]:
         """"""
 
-        node_elements = [child for child in self._interface if child.tag == "node"]
-        return [self.parse_node(node) for node in node_elements]
+        node_elements = [child for child in cls._interface if child.tag == "node"]
+        return [cls.parse_node(node) for node in node_elements]
 
-    def parse_node(self, node):
+    @classmethod
+    def parse_node(cls, node):
         try:
             name = node.attrib["name"]
         except KeyError as e:
@@ -164,14 +167,19 @@ class InterfaceParser_v1:
         topics = []
 
         for child in node:
-            if child.tag == "action":
-                actions.append(self.parse_action(child))
-            if child.tag == "parameter":
-                parameters.append(self.parse_parameter(child))
-            if child.tag == "service":
-                services.append(self.parse_service(child))
-            if child.tag == "topic":
-                topics.append(self.parse_topic(child))
+            try:
+                if child.tag == "action":
+                    actions.append(cls.parse_action(child))
+                if child.tag == "parameter":
+                    parameters.append(cls.parse_parameter(child))
+                if child.tag == "service":
+                    services.append(cls.parse_service(child))
+                if child.tag == "topic":
+                    topics.append(cls.parse_topic(child))
+            except KeyError as excinfo:
+                raise InvalidNoDLException(
+                    f"{child.tag} is missing required attribute {excinfo.args[0]}", child
+                )
 
         return Node(
             name=name, actions=actions, parameters=parameters, services=services, topics=topics
