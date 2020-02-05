@@ -15,6 +15,8 @@ from typing import List, Optional
 import warnings
 
 from lxml import etree
+from rclpy import qos
+from rclpy.duration import Duration
 
 from nodl.nodl_types import Action, Node, Parameter, Service, Topic
 
@@ -30,7 +32,7 @@ def str_to_bool(boolean_string: str) -> bool:
 class InvalidNoDLException(Exception):
     def __init__(self, message: str, element: Optional[etree._Element] = None) -> None:
         if element is not None:
-            super().__init__(f"{element.base}:{element.sourceline}: " + message)
+            super().__init__(f"{element.base}:{element.sourceline}  " + message)
         else:
             super().__init__(message)
 
@@ -38,7 +40,7 @@ class InvalidNoDLException(Exception):
 class UnsupportedInterfaceException(InvalidNoDLException):
     def __init__(self, element: etree._Element) -> None:
         super().__init__(
-            f"{element.base}:{element.sourceline}: Unsupported interface version: "
+            f"{element.base}:{element.sourceline}  Unsupported interface version: "
             f"{element.attrib['version']} > {NODL_MAX_SUPPORTED_VERSION}"
         )
 
@@ -50,13 +52,13 @@ class NoNodeInterfaceWarning(UserWarning):
 def parse_element_tree(element_tree: etree._ElementTree) -> etree._Element:
     interface = element_tree.getroot()
     if interface.tag != "interface":
-        interface = interface.find("interface")
+        interface = next(interface.iter("interface"), None)
         if interface is None:
             raise InvalidNoDLException(f"No interface tag in {element_tree.docinfo.URL}")
     return interface
 
 
-def parse_nodl_file(path: Path):
+def parse_nodl_file(path: Path) -> List[Node]:
     """"""
     full_path = path.resolve()
     element_tree = etree.parse(str(full_path))
@@ -68,16 +70,53 @@ def parse_nodl_file(path: Path):
         raise InvalidNoDLException(f"Missing version attribute in 'interface'.", interface)
 
     if version == "1":
-        return Interface_v1(interface)
+        return Interface_v1.parse_nodes(interface)
     else:
         raise UnsupportedInterfaceException(interface)
 
 
+def parse_qos(element: Optional[etree._Element]) -> qos.QoSProfile:
+    """"""
+    profile: qos.QoSProfile = qos.QoSProfile(**qos.QoSProfile._QoSProfile__qos_profile_default_dict)
+
+    if element is not None:
+        try:
+            if element.get("history"):
+                profile.history = qos.HistoryPolicy.get_from_short_key(element.get("history"))
+            if element.get("reliability"):
+                profile.reliability = qos.ReliabilityPolicy.get_from_short_key(
+                    element.get("reliability")
+                )
+            if element.get("durability"):
+                profile.durability = qos.DurabilityPolicy.get_from_short_key(
+                    element.get("durability")
+                )
+            if element.get("lifespan"):
+                profile.lifespan = Duration(nanoseconds=float(element.get("lifespan")))
+            if element.get("liveliness"):
+                profile.liveliness = qos.LivelinessPolicy.get_from_short_key(
+                    element.get("liveliness")
+                )
+            if element.get("liveliness_lease_duration"):
+                profile.liveliness_lease_duration = Duration(
+                    nanoseconds=float(
+                        element.get("liveliness_lease_duration", profile.liveliness_lease_duration)
+                    )
+                )
+            if element.get("avoid_ros_namespace_conventions"):
+                profile.avoid_ros_namespace_conventions = str_to_bool(
+                    str(element.get("avoid_ros_namespace_conventions"))
+                )
+        except KeyError as excinfo:
+            raise InvalidNoDLException(
+                f"Couldn't parse QoS, {excinfo.args[0]} is not a valid policy", element
+            ) from excinfo
+
+    return profile
+
+
 class Interface_v1:
     """"""
-
-    def __init__(self, interface: etree._Element) -> None:
-        self._interface = interface
 
     @classmethod
     def parse_action(cls, element: etree._Element) -> Action:
@@ -89,15 +128,19 @@ class Interface_v1:
         name = attribs["name"]
         action_type = attribs["type"]
 
-        server = str_to_bool(attribs.get("server", False))
-        client = str_to_bool(attribs.get("client", False))
+        server = str_to_bool(attribs.get("server", "False"))
+        client = str_to_bool(attribs.get("client", "False"))
         if not (server or client):
             warnings.warn(
                 f"{element.base}:{element.sourceline}: {name} is neither server or client",
                 NoNodeInterfaceWarning,
             )
 
-        return Action(name=name, action_type=action_type, server=server, client=client)
+        policy = element.find("qos")
+
+        return Action(
+            name=name, action_type=action_type, server=server, client=client, qos=parse_qos(policy)
+        )
 
     @classmethod
     def parse_parameter(cls, element: etree._Element) -> Parameter:
@@ -111,8 +154,8 @@ class Interface_v1:
         name = attribs["name"]
         service_type = attribs["type"]
 
-        server = str_to_bool(attribs.get("server", False))
-        client = str_to_bool(attribs.get("client", False))
+        server = str_to_bool(attribs.get("server", "False"))
+        client = str_to_bool(attribs.get("client", "False"))
 
         if not (server or client):
             warnings.warn(
@@ -120,46 +163,51 @@ class Interface_v1:
                 NoNodeInterfaceWarning,
             )
 
-        return Service(name=name, service_type=service_type, server=server, client=client)
+        policy = element.find("qos")
+
+        return Service(
+            name=name,
+            service_type=service_type,
+            server=server,
+            client=client,
+            qos=parse_qos(policy),
+        )
 
     @classmethod
     def parse_topic(cls, element: etree._Element) -> Topic:
         """"""
         attribs = element.attrib
-        try:
-            name = attribs["name"]
-            message_type = attribs["type"]
-        except KeyError as e:
-            raise InvalidNoDLException(
-                f"Topic is missing required attribute {e.args[0]}", element
-            ) from e
+        name = attribs["name"]
+        message_type = attribs["type"]
 
-        publisher = str_to_bool(attribs.get("publisher", False))
-        subscriber = str_to_bool(attribs.get("subscriber", False))
-
+        publisher = str_to_bool(attribs.get("publisher", "False"))
+        subscriber = str_to_bool(attribs.get("subscriber", "False"))
         if not (publisher or subscriber):
             warnings.warn(
                 f"{element.base}:{element.sourceline}: {name} is neither publisher or subscriber",
                 NoNodeInterfaceWarning,
             )
 
+        policy = element.find("qos")
+
         return Topic(
-            name=name, message_type=message_type, publisher=publisher, subscriber=subscriber
+            name=name,
+            message_type=message_type,
+            publisher=publisher,
+            subscriber=subscriber,
+            qos=parse_qos(policy),
         )
 
     @classmethod
-    def parse_nodes(cls) -> List[Node]:
+    def parse_nodes(cls, interface) -> List[Node]:
         """"""
 
-        node_elements = [child for child in cls._interface if child.tag == "node"]
+        node_elements = [child for child in interface if child.tag == "node"]
         return [cls.parse_node(node) for node in node_elements]
 
     @classmethod
-    def parse_node(cls, node):
-        try:
-            name = node.attrib["name"]
-        except KeyError as e:
-            raise InvalidNoDLException(f"Node is missing required attribute {e.args[0]}") from e
+    def parse_node(cls, node: etree._Element) -> Node:
+        name = node.attrib["name"]
 
         actions = []
         parameters = []
@@ -178,8 +226,8 @@ class Interface_v1:
                     topics.append(cls.parse_topic(child))
             except KeyError as excinfo:
                 raise InvalidNoDLException(
-                    f"{child.tag} is missing required attribute {excinfo.args[0]}", child
-                )
+                    f"{child.tag} is missing required attribute '{excinfo.args[0]}'", child
+                ) from excinfo
 
         return Node(
             name=name, actions=actions, parameters=parameters, services=services, topics=topics
