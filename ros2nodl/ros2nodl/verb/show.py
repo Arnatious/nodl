@@ -14,7 +14,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from ros2nodl.api import (
-    get_share_nodl_files_from_package,
+    get_nodl_files_from_package_share,
     NoDLFileNameCompleter,
     NoNoDLFilesError,
     show_nodl,
@@ -54,7 +54,7 @@ class ShowVerb(VerbExtension):
     def main(self, *, args: 'argparse.Namespace'):
         try:
             package = args.package_name
-            paths = get_share_nodl_files_from_package(package_name=package)
+            paths = get_nodl_files_from_package_share(package_name=package)
         except (PackageNotFoundError, NoNoDLFilesError) as e:
             print(e, file=sys.stderr)
             return 1
@@ -70,5 +70,4 @@ class ShowVerb(VerbExtension):
                     return 1
             paths = [path for path in paths if path.name in args.file]
 
-        for path in paths:
-            show_nodl(path=path, raw=args.raw)
+            show_nodl(paths=paths, raw=args.raw)

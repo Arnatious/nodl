@@ -12,9 +12,9 @@
 
 
 from .api import (  # noqa: F401
+    get_nodl_files_from_package_share,
     get_nodl_xml_files_in_path,
     get_package_share_directory,
-    get_share_nodl_files_from_package,
     NoDLFileNameCompleter,
     NoNoDLFilesError,
     show_nodl,
