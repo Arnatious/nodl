@@ -15,11 +15,42 @@ from typing import TYPE_CHECKING
 from lxml import etree
 
 if TYPE_CHECKING:  # pragma: no cover
+    from nodl.types._types import Node, NoDLInterface
     import rclpy.qos
 
 
 class NoDLError(Exception):
     """Base class for all NoDL exceptions."""
+
+
+class NodeMergeError(NoDLError):
+    """Error raised when two nodes are unable to be merged."""
+
+    def __init__(self, msg: str, node_a: 'Node', node_b: 'Node') -> None:
+        super().__init__(f'Could not merge node {node_a.name}: {msg}')
+        self.node_a = node_a
+        self.node_b = node_b
+
+
+class NodeMergeConflictError(NodeMergeError):
+    """Error raised when there is a conflict between items in a node."""
+
+    def __init__(
+        self,
+        node_a: 'Node',
+        node_b: 'Node',
+        interface_a: 'NoDLInterface',
+        interface_b: 'NoDLInterface',
+    ) -> None:
+        super().__init__(
+            f'Conflict between {interface_a._as_dict} and {interface_b._as_dict}', node_a, node_b
+        )
+        self.interface_a = interface_a
+        self.interface_b = interface_b
+
+
+# Parsing Errors
+# region
 
 
 class InvalidNoDLError(NoDLError):
@@ -45,6 +76,8 @@ class InvalidElementError(InvalidNoDLError):
             f'Error parsing {element.tag} from {element.base}, line {element.sourceline}: '
             + message
         )
+        self.element = element
+        self.name = element.get('name', None)
 
 
 class InvalidQoSError(InvalidElementError):
@@ -67,6 +100,8 @@ class InvalidQOSAttributeValueError(InvalidQoSError):
         super().__init__(
             f'Value: {element.get(attribute)} is not valid for attribute {attribute}', element
         )
+        self.attribute = attribute
+        self.value = element.get(attribute)
 
 
 class InvalidActionError(InvalidElementError):
@@ -117,3 +152,6 @@ class UnsupportedInterfaceError(InvalidNoDLError):
 
     def __init__(self, version: int, max_version: int) -> None:
         super().__init__(f'Unsupported interface version: {version} must be <= {max_version}')
+
+
+# endregion
