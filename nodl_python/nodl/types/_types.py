@@ -38,9 +38,9 @@ class NoDLData(ABC):
 class NoDLInterface(NoDLData, ABC):
     """Abstract base class for NoDL communication interfaces."""
 
-    def __init__(self, *, name: str, type: str) -> None:
+    def __init__(self, *, name: str, value_type: str) -> None:
         self.name = name
-        self.type = type
+        self.type = value_type
 
     def __eq__(self, other: Any) -> bool:
         return (
@@ -60,7 +60,7 @@ class Action(NoDLInterface):
         client: bool = False,
         qos: QoSProfile = QoSPresetProfiles.ACTION_STATUS_DEFAULT.value
     ) -> None:
-        super().__init__(name=name, type=action_type)
+        super().__init__(name=name, value_type=action_type)
         self.server = server
         self.client = client
 
@@ -71,7 +71,7 @@ class Parameter(NoDLInterface):
     """Data structure for parameter entries in NoDL."""
 
     def __init__(self, *, name: str, parameter_type: str) -> None:
-        super().__init__(name=name, type=parameter_type)
+        super().__init__(name=name, value_type=parameter_type)
 
 
 class Service(NoDLInterface):
@@ -86,7 +86,7 @@ class Service(NoDLInterface):
         client: bool = False,
         qos: QoSProfile = QoSPresetProfiles.SERVICES_DEFAULT.value
     ) -> None:
-        super().__init__(name=name, type=service_type)
+        super().__init__(name=name, value_type=service_type)
         self.server = server
         self.client = client
 
@@ -105,7 +105,7 @@ class Topic(NoDLInterface):
         subscription: bool = False,
         qos: QoSProfile = QoSPresetProfiles.SYSTEM_DEFAULT.value
     ) -> None:
-        super().__init__(name=name, type=message_type)
+        super().__init__(name=name, value_type=message_type)
         self.publisher = publisher
         self.subscription = subscription
 
