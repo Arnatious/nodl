@@ -10,21 +10,16 @@
 # You should have received a copy of the GNU Limited General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
-from collections import namedtuple
 from pathlib import Path
 import pprint
-import sys
 from typing import Dict, List, Optional, TYPE_CHECKING
 
 from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
 from nodl import parse as parse_nodl
 import nodl.errors
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     import nodl.types
-
-
-if TYPE_CHECKING:
     import argparse
 
 
@@ -35,18 +30,27 @@ class NoNoDLFilesError(Exception):
         super().__init__(f'{package_name} has no NoDL files in its ament index.')
 
 
-def get_nodl_files_from_package_share(*, package_name: str) -> List[Path]:
-    """
-    Return all .nodl.xml files from the share directory of a package.
+class FailedMergeError(nodl.errors.NodeMergeConflictError):
 
-    :raises: PackageNotFoundError if package is not found
-    :raises: NoNoDLFilesError if no .nodl.xml files are in package share directory
-    """
-    package_share_directory = Path(get_package_share_directory(package_name))
-    nodl_paths = get_nodl_xml_files_in_path(path=package_share_directory)
-    if not nodl_paths:
-        raise NoNoDLFilesError(package_name)
-    return nodl_paths
+    def __init__(self, error: nodl.errors.NodeMergeConflictError) -> None:
+        msg = (
+            f'Failed to merge node "{error.node_a.name}" from {error.node_a.paths} ',
+            f'with existing entry from {error.node_b.paths}\n',
+            f'{error.node_a.paths[0]}:\n',
+            f'{"-" * 80}\n',
+            f'{pprint.pformat(error.node_a._as_dict)}\n',
+            f'\n',
+            f'{pprint.pformat(error.node_b.paths)}:\n',
+            f'{"-" * 80}\n',
+            f'{pprint.pformat(error.node_b._as_dict)}',
+        )
+        super().__init__(
+            msg=msg,
+            node_a=error.node_a,
+            node_b=error.node_b,
+            interface_a=error.interface_a,
+            interface_b=error.interface_b,
+        )
 
 
 def get_nodl_xml_files_in_path(*, path: Path) -> List[Path]:
@@ -54,29 +58,18 @@ def get_nodl_xml_files_in_path(*, path: Path) -> List[Path]:
     return sorted(path.glob('**/*.nodl.xml'))
 
 
-def _do_parse_nodl(*, path: Path) -> List[Path]:
-    try:
-        nodes = parse_nodl(path)
-    except nodl.errors.InvalidNoDLDocumentError as e:
-        print(f'Parsing of {path.name} failed', file=sys.stderr)
-        print(e, file=sys.stderr)
-        raise e
-    return nodes
-
-
-def show_nodl(*, paths: List[Path], raw: bool = False):
+def get_nodl_files_from_package_share(*, package_name: str) -> List[Path]:
     """
-    Print filename and either contents or NoDL data to console.
+    Return all .nodl.xml files from the share directory of a package.
 
-    :param paths: Name of nodl files to show
-    :type paths: List[Path]
-    :param raw: Whether to print file as-is or parse, defaults to False
-    :type raw: bool, optional
+    :raises PackageNotFoundError: if package is not found
+    :raises NoNoDLFilesError: if no .nodl.xml files are in package share directory
     """
-    if raw:
-        show_nodl_raw(paths=paths)
-    else:
-        show_nodl_parsed(paths=paths)
+    package_share_directory = Path(get_package_share_directory(package_name))
+    nodl_paths = get_nodl_xml_files_in_path(path=package_share_directory)
+    if not nodl_paths:
+        raise NoNoDLFilesError(package_name)
+    return nodl_paths
 
 
 def show_nodl_raw(*, paths: List[Path]):
@@ -91,17 +84,15 @@ def show_nodl_raw(*, paths: List[Path]):
         print(path.read_text())
 
 
-def show_nodl_parsed(*, paths: List[Path]) -> bool:
+def _merge_nodl_files(*, paths: List[Path]) -> 'List[nodl.types.Node]':
     """
-    Print filename and contents to console.
+    Recursively merge any nodes with the same name across multiple files.
 
-    :param paths: Names of nodl file to show
-    :type paths: List[Path]
+    :raises e: NodeMergeConflictError if merge conflict occurs
+    :return: List of nodes from all input files, with same name nodes merged
+    :rtype: List[nodl.types.Node]
     """
-    try:
-        node_lists = {path: parse_nodl(path) for path in paths}
-    except nodl.errors.InvalidNoDLDocumentError:
-        return False
+    node_lists = {path: parse_nodl(path) for path in paths}
     combined: Dict[str, '_NodeWithOrigin'] = {}
     for path, node_list in node_lists.items():
         for node in node_list:
@@ -111,54 +102,23 @@ def show_nodl_parsed(*, paths: List[Path]) -> bool:
             else:
                 try:
                     combined[node.name] += current_node
-                except nodl.errors.NodeMergeConflictError:
-                    _report_merge_error(current_node, combined[node.name])
-
-                    return False
-    pprint.pprint(node._as_dict)
-    return True
+                except nodl.errors.NodeMergeConflictError as e:
+                    raise FailedMergeError(error=e)
+    return combined.values()
 
 
-def validate_nodl_file(*, path: Path) -> bool:
+def show_nodl_parsed(*, paths: List[Path]):
     """
-    Validate the NoDL file at the given path by attempting to parse it.
+    Pretty print a dict-like representation of all nodes to console.
 
-    Requires `path` be a valid path.
+    :param paths: Names of nodl file to show
+    :type paths: List[Path]
 
-    :param path: Path of an existing NoDL file.
-    :type path: Path
-    :return: Whether validation succeeded.
-    :rtype: bool
+    :raises FailedMergeError: if nodes with the same name are present and cannot merge.
     """
-    try:
-        parse_nodl(path)
-    except nodl.errors.InvalidNoDLDocumentError as e:
-        print(f'Validation of {str(path)} failed', file=sys.stderr)
-        print(e, file=sys.stderr)
-        return False
-    return True
-
-
-def _report_merge_error(current_node: '_NodeWithOrigin', existing_node: '_NodeWithOrigin'):
-    print(
-        (
-            f'Failed to merge node "{current_node.node.name}" from {current_node.paths} ',
-            f'with existing entry from {existing_node.paths}',
-        ),
-        file=sys.stderr,
-    )
-    print(
-        (
-            f'{current_node.paths[0]}:\n',
-            f'{"-" * 80}\n',
-            f'{pprint.pformat(current_node.node._as_dict)}\n',
-            f'\n',
-            f'{pprint.pformat(existing_node.paths)}:\n',
-            f'{"-" * 80}\n',
-            f'{pprint.pformat(existing_node.node._as_dict)}',
-        ),
-        file=sys.stderr,
-    )
+    nodes = _merge_nodl_files(paths=paths)
+    for node in nodes:
+        pprint.pprint(node._as_dict)
 
 
 class NoDLFileNameCompleter:
@@ -185,13 +145,20 @@ class NoDLFileNameCompleter:
             return ['package not found']
 
 
-class _NodeWithOrigin:
+class _NodeWithOrigin(nodl.types.Node):
     """Helper class to track the file(s) that a given node came from."""
 
     def __init__(self, paths: List[Path], node: 'nodl.types.Node') -> None:
+        super().__init__(
+            name=node.name,
+            actions=node.actions.values(),
+            parameters=node.parameters.values(),
+            services=node.services.values(),
+            topics=node.topics.values(),
+        )
         self.paths = paths
-        self.node = node
 
-    def __iadd__(self, other: '_NodeWithOrigin'):
+    def __iadd__(self, other: '_NodeWithOrigin') -> '_NodeWithOrigin':
         self.paths += other.paths
-        self.node += other.node
+        self = super().__iadd__(other)
+        return self

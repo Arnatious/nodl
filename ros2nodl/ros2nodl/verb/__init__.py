@@ -10,10 +10,10 @@
 # You should have received a copy of the GNU Limited General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
-from ros2cli.plugin_system import PLUGIN_SYSTEM_VERSION, satisfies_version
+from ros2cli.plugin_system import PLUGIN_SYSTEM_VERSION, satisfies_version  # pragma: no cover
 
 
-class VerbExtension:
+class VerbExtension:  # pragma: no cover
     """"""
 
     NAME = None

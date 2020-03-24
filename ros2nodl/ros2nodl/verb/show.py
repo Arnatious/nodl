@@ -14,10 +14,12 @@ import sys
 from typing import TYPE_CHECKING
 
 from ros2nodl.api import (
+    FailedMergeError,
     get_nodl_files_from_package_share,
     NoDLFileNameCompleter,
     NoNoDLFilesError,
-    show_nodl,
+    show_nodl_parsed,
+    show_nodl_raw,
 )
 from ros2nodl.verb import VerbExtension
 from ros2pkg.api import package_name_completer, PackageNotFoundError
@@ -51,7 +53,7 @@ class ShowVerb(VerbExtension):
             '--raw', help='Print raw file contents, without parsing.', action='store_true'
         )
 
-    def main(self, *, args: 'argparse.Namespace'):
+    def main(self, *, args: 'argparse.Namespace') -> int:
         try:
             package = args.package_name
             paths = get_nodl_files_from_package_share(package_name=package)
@@ -70,4 +72,12 @@ class ShowVerb(VerbExtension):
                     return 1
             paths = [path for path in paths if path.name in args.file]
 
-            show_nodl(paths=paths, raw=args.raw)
+            if args.raw:
+                show_nodl_raw(paths=paths)
+            else:
+                try:
+                    show_nodl_parsed(paths=paths)
+                except FailedMergeError as e:
+                    print(e, sys.stderr)
+                    return 1
+        return 0
