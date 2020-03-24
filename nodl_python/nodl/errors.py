@@ -37,13 +37,20 @@ class NodeMergeConflictError(NodeMergeError):
 
     def __init__(
         self,
+        *,
+        msg: str = '',
         node_a: 'Node',
         node_b: 'Node',
         interface_a: 'NoDLInterface',
         interface_b: 'NoDLInterface',
     ) -> None:
         super().__init__(
-            f'Conflict between {interface_a._as_dict} and {interface_b._as_dict}', node_a, node_b
+            (
+                f'Conflict between {interface_a._as_dict} and {interface_b._as_dict}'
+                + (f': {msg}' if msg else '')
+            ),
+            node_a,
+            node_b,
         )
         self.interface_a = interface_a
         self.interface_b = interface_b

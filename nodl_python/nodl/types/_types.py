@@ -159,7 +159,10 @@ class Node(NoDLData):
                     if getattr(self, interface_type)[name] != interface:
                         # If the [action, topic, etc] is not identically defined
                         raise NodeMergeConflictError(
-                            self, other, getattr(self, interface_type)[name], interface
+                            node_a=self,
+                            node_b=other,
+                            interface_a=getattr(self, interface_type)[name],
+                            interface_b=interface,
                         )
                 # Add the [action, topic, etc] to the result node
                 getattr(self, interface_type)[name] = interface
