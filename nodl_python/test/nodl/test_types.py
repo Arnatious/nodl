@@ -96,22 +96,3 @@ def test_node__as_dict():
     node = nodl.types.Node(name='test', topics=[topic], services=[service])
     assert node._as_dict['name'] == node.name
     assert topic._as_dict in node._as_dict['topics']
-
-
-def test_node___iadd__():
-    topic = nodl.types.Topic(name='foo', message_type='bar')
-    service = nodl.types.Service(name='baz', service_type='woo')
-
-    node = nodl.types.Node(name='test', topics=[topic], services=[service])
-
-    other_service = nodl.types.Service(name='fizz', service_type='buzz')
-    other_node = nodl.types.Node(name='test', topics=[topic], services=[other_service])
-
-    node += other_node
-    assert node.services['fizz'] == other_service
-
-    other_topic = nodl.types.Topic(name='foo', message_type='bug')
-    other_node = nodl.types.Node(name='test', topics=[other_topic])
-
-    with pytest.raises(nodl.errors.NodeMergeConflictError):
-        node += other_node

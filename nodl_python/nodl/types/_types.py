@@ -14,7 +14,6 @@ from abc import ABC
 from typing import Any, Dict, List
 
 from nodl._util import qos_to_dict
-from nodl.errors import NodeMergeConflictError
 from rclpy.qos import QoSPresetProfiles, QoSProfile
 
 
@@ -140,30 +139,3 @@ class Node(NoDLData):
             'services': [service._as_dict for service in self.services.values()],
             'topics': [topic._as_dict for topic in self.topics.values()],
         }
-
-    def __iadd__(self, other: 'Node') -> 'Node':
-        """
-        Attempt to merge two Nodes.
-
-        :raises NodeMergeConflictError: error raised when the same entry is in both nodes and
-        doesn't match.
-        :return: New node with copy of all elements of the operands
-        :rtype: Node
-        """
-        for interface_type in ['actions', 'parameters', 'services', 'topics']:
-            # For each interface type
-            for name, interface in getattr(other, interface_type).items():
-                # Get the specific [action, topic, etc]
-                if name in getattr(self, interface_type):
-                    # If the [action, topic, etc] is already in self
-                    if getattr(self, interface_type)[name] != interface:
-                        # If the [action, topic, etc] is not identically defined
-                        raise NodeMergeConflictError(
-                            node_a=self,
-                            node_b=other,
-                            interface_a=getattr(self, interface_type)[name],
-                            interface_b=interface,
-                        )
-                # Add the [action, topic, etc] to the result node
-                getattr(self, interface_type)[name] = interface
-        return self
