@@ -10,7 +10,7 @@
 # You should have received a copy of the GNU Limited General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from nodl._util import qos_to_dict
 from rclpy.qos import QoSPresetProfiles, QoSProfile
@@ -117,17 +117,19 @@ class Node(NoDLData):
         self,
         *,
         name: str,
-        actions: List[Action] = [],
-        parameters: List[Parameter] = [],
-        services: List[Service] = [],
-        topics: List[Topic] = []
+        actions: Optional[List[Action]] = None,
+        parameters: Optional[List[Parameter]] = None,
+        services: Optional[List[Service]] = None,
+        topics: Optional[List[Topic]] = None
     ) -> None:
         self.name = name
 
-        self.actions = {action.name: action for action in actions}
-        self.parameters = {parameter.name: parameter for parameter in parameters}
-        self.services = {service.name: service for service in services}
-        self.topics = {topic.name: topic for topic in topics}
+        self.actions = {action.name: action for action in actions} if actions else {}
+        self.parameters = (
+            {parameter.name: parameter for parameter in parameters} if parameters else {}
+        )
+        self.services = {service.name: service for service in services} if services else {}
+        self.topics = {topic.name: topic for topic in topics} if topics else {}
 
     @property
     def _as_dict(self):
