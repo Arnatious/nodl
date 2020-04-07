@@ -49,7 +49,7 @@ def _parse_element_tree(element_tree: etree._ElementTree) -> List[Node]:
     return _parse_interface(element_tree.getroot())
 
 
-def parse(*, path: Union[str, Path, IO]) -> List[Node]:
+def parse(path: Union[str, Path, IO]) -> List[Node]:
     """Parse the nodes out of a given NoDL file.
 
     :param path: location of file, or opened file object

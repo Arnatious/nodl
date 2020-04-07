@@ -22,10 +22,6 @@ class NoDLError(Exception):
     """Base class for all NoDL exceptions."""
 
 
-# Parsing Errors
-# region
-
-
 class InvalidNoDLError(NoDLError):
     """Exception class representing most errors in parsing the NoDL tree."""
 
@@ -50,7 +46,6 @@ class InvalidElementError(InvalidNoDLError):
             + message
         )
         self.element = element
-        self.name = element.get('name', None)
 
 
 class InvalidQoSError(InvalidElementError):
@@ -74,7 +69,6 @@ class InvalidQOSAttributeValueError(InvalidQoSError):
             f'Value: {element.get(attribute)} is not valid for attribute {attribute}', element
         )
         self.attribute = attribute
-        self.value = element.get(attribute)
 
 
 class InvalidActionError(InvalidElementError):
@@ -125,6 +119,3 @@ class UnsupportedInterfaceError(InvalidNoDLError):
 
     def __init__(self, version: int, max_version: int) -> None:
         super().__init__(f'Unsupported interface version: {version} must be <= {max_version}')
-
-
-# endregion

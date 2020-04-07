@@ -10,14 +10,13 @@
 # You should have received a copy of the GNU Limited General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
-from abc import ABC
 from typing import Any, Dict, List
 
 from nodl._util import qos_to_dict
 from rclpy.qos import QoSPresetProfiles, QoSProfile
 
 
-class NoDLData(ABC):
+class NoDLData:
     """Data structure base class for NoDL objects."""
 
     def __repr__(self) -> str:
@@ -34,7 +33,7 @@ class NoDLData(ABC):
         return self_dict
 
 
-class NoDLInterface(NoDLData, ABC):
+class NoDLInterface(NoDLData):
     """Abstract base class for NoDL communication interfaces."""
 
     def __init__(self, *, name: str, value_type: str) -> None:
