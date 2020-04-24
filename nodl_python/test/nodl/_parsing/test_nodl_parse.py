@@ -40,14 +40,16 @@ def test__parse_element_tree(mocker):
 def test_parse_nodl_file_valid(mocker):
     mocker.patch('nodl._parsing._parsing._parse_element_tree')
 
+    path = Path(__file__).parents[1] / 'test.nodl.xml'
+
     # Test if accepts a valid xml file
-    assert nodl._parsing._parsing.parse(path=Path('test/nodl/test.nodl.xml')) is not None
+    assert nodl._parsing._parsing.parse(path=path) is not None
 
     # Test if accepts file name as string
-    assert nodl._parsing._parsing.parse(path='test/nodl/test.nodl.xml') is not None
+    assert nodl._parsing._parsing.parse(path=str(path)) is not None
 
     # Test if accepts file object
-    with open('test/nodl/test.nodl.xml', 'rb') as fd:
+    with path.open('rb') as fd:
         assert nodl._parsing._parsing.parse(path=fd) is not None
 
 
