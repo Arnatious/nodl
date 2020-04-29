@@ -11,4 +11,5 @@
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-from ._parsing import parse  # noqa: F401
+from ._index import get_nodl_files_from_package_share  # noqa: F401
+from ._parsing import parse, parse_multiple  # noqa: F401

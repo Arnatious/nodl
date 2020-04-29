@@ -12,8 +12,7 @@
 
 from typing import List, Optional, TYPE_CHECKING
 
-from ros2cli.command import add_subparsers, CommandExtension
-from ros2cli.verb import get_verb_extensions
+from ros2cli.command import add_subparsers_on_demand, CommandExtension
 
 if TYPE_CHECKING:
     import argparse
@@ -26,9 +25,13 @@ class NoDLCommand(CommandExtension):
         self, parser: 'argparse.ArgumentParser', cli_name: str, *, argv: Optional[List] = None
     ):
         self._subparser = parser
-        verb_extensions = get_verb_extensions('ros2nodl.verb')
-        add_subparsers(
-            parser, cli_name, '_verb', verb_extensions, required=False
+        add_subparsers_on_demand(
+            parser=parser,
+            cli_name=cli_name,
+            dest='_verb',
+            group_name='ros2nodl.verb',
+            required=False,
+            argv=argv,
         )
 
     def main(self, *, parser, args):

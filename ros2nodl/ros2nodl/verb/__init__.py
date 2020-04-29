@@ -10,11 +10,21 @@
 # You should have received a copy of the GNU Limited General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
-from ros2cli.plugin_system import PLUGIN_SYSTEM_VERSION, satisfies_version  # pragma: no cover
+from ros2cli.plugin_system import PLUGIN_SYSTEM_VERSION, satisfies_version
 
 
-class VerbExtension:  # pragma: no cover
-    """"""
+class VerbExtension:
+    """The extension point for 'security' verb extensions.
+
+    The following properties must be defined:
+    * `NAME` (will be set to the entry point name)
+
+    The following methods must be defined:
+    * `main`
+
+    The following methods can be defined:
+    * `add_arguments`
+    """
 
     NAME = None
     EXTENSION_POINT_VERSION = '0.1'

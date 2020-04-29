@@ -13,18 +13,17 @@
 import sys
 from typing import TYPE_CHECKING
 
+from nodl import get_nodl_files_from_package_share
+from nodl.errors import DuplicateNodeError, NoNoDLFilesError
 from ros2nodl.api import (
-    FailedMergeError,
-    get_nodl_files_from_package_share,
     NoDLFileNameCompleter,
-    NoNoDLFilesError,
     show_nodl_parsed,
     show_nodl_raw,
 )
 from ros2nodl.verb import VerbExtension
 from ros2pkg.api import package_name_completer, PackageNotFoundError
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     import argparse
 
 
@@ -61,8 +60,8 @@ class ShowVerb(VerbExtension):
             print(e, file=sys.stderr)
             return 1
 
+        short_paths = [path.name for path in paths]
         if args.file:
-            short_paths = [path.name for path in paths]
             for filename in args.file:
                 if filename not in short_paths:
                     print(
@@ -72,12 +71,12 @@ class ShowVerb(VerbExtension):
                     return 1
             paths = [path for path in paths if path.name in args.file]
 
-            if args.raw:
-                show_nodl_raw(paths=paths)
-            else:
-                try:
-                    show_nodl_parsed(paths=paths)
-                except FailedMergeError as e:
-                    print(e, sys.stderr)
-                    return 1
+        if args.raw:
+            show_nodl_raw(paths=paths)
+        else:
+            try:
+                show_nodl_parsed(paths=paths)
+            except DuplicateNodeError as e:
+                print(e, sys.stderr)
+                return 1
         return 0
