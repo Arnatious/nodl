@@ -10,8 +10,9 @@
 # You should have received a copy of the GNU Limited General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
+from collections import defaultdict
 from pathlib import Path
-from typing import Dict, IO, List, Union
+from typing import Dict, IO, List, Sequence, Union
 
 from lxml import etree
 from nodl._parsing import _v1 as parse_v1
@@ -65,21 +66,24 @@ def parse(path: Union[str, Path, IO]) -> List[Node]:
     return _parse_element_tree(element_tree)
 
 
-def parse_multiple(paths: List[Union[str, Path, IO]]) -> List[Node]:
+def parse_multiple(paths: Sequence[Union[str, Path, IO]]) -> List[Node]:
     """Merge nodl files into one large node list.
 
     :param paths: List of nodl files to parse
-    :type paths: List[Union[str, Path, IO]]
+    :type paths: Sequence[Union[str, Path, IO]]
     :raises DuplicateNodeError: if node is defined multiple times
     :raises InvalidNoDLDocumentError: if doc does not adhere to schema
     :return: flat list of nodes provided by the documents
     :rtype: List[Node]
     """
     node_lists = [parse(path) for path in paths]
-    combined: Dict[str, Node] = {}
+    combined = []
+    combined_dict: Dict[str, List] = defaultdict(list)
     for node_list in node_lists:
         for node in node_list:
-            if node.name in combined and combined[node.name].executable == node.executable:
-                raise DuplicateNodeError(node=node)
-            combined[node.name] = node
-    return list(combined.values())
+            if node.name in combined_dict:
+                if node.executable in combined_dict[node.name]:
+                    raise DuplicateNodeError(node=node)
+            combined_dict[node.name].append(node.executable)
+            combined.append(node)
+    return combined

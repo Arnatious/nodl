@@ -11,8 +11,8 @@
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-import nodl._index
 import nodl.errors
+import nodl.index
 import pytest
 
 
@@ -30,19 +30,28 @@ def tmp_share(tmp_path):
 
 def test_get_nodl_xml_files_in_path(tmp_share):
     assert all(
-        fname in nodl._index.get_nodl_xml_files_in_path(path=tmp_share)
+        fname in nodl.index.get_nodl_xml_files_in_path(path=tmp_share)
         for fname in [tmp_share / 'a.nodl.xml', tmp_share / 'has_nodl/b.nodl.xml']
     )
 
 
 def test_get_nodl_files_from_package_share(mocker, tmp_share):
     # Test gets all files recursively
-    mock = mocker.patch('nodl._index.get_package_share_directory', return_value=tmp_share)
+    mock = mocker.patch('nodl.index.get_package_share_directory', return_value=tmp_share)
     assert all(
-        fname in nodl._index.get_nodl_files_from_package_share(package_name='foo')
+        fname in nodl.index.get_nodl_files_from_package_share(package_name='foo')
         for fname in [tmp_share / 'a.nodl.xml', tmp_share / 'has_nodl/b.nodl.xml']
     )
 
     mock.return_value = tmp_share / 'no_nodl'
     with pytest.raises(nodl.errors.NoNoDLFilesError):
-        nodl._index.get_nodl_files_from_package_share(package_name='foo')
+        nodl.index.get_nodl_files_from_package_share(package_name='foo')
+
+
+def test_get_nodes_from_package(mocker):
+    mock_package = mocker.patch('nodl.index.get_nodl_files_from_package_share')
+    mock_parse = mocker.patch('nodl.index.parse_multiple')
+
+    res = nodl.index.get_nodes_from_package(package_name='foo')
+    mock_package.assert_called_with(package_name='foo')
+    assert res == mock_parse.return_value
