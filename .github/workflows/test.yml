@@ -21,7 +21,7 @@ jobs:
     - uses: actions/checkout@v1
 
     - name: Setup ROS2
-      uses: ros-tooling/setup-ros@0.0.15
+      uses: ros-tooling/setup-ros@0.0.20
       with:
         required-ros-distributions: eloquent
 
@@ -31,12 +31,12 @@ jobs:
         pip3 install lxml
 
     - name: Run Tests
-      uses: ros-tooling/action-ros-ci@0.0.13
+      uses: ros-tooling/action-ros-ci@0.0.16
       with:
         package-name: nodl_python
 
     - name: Upload Logs
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v2
       with:
         name: colcon-logs
         path: ros_ws/log
